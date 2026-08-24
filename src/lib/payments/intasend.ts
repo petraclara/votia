@@ -1,4 +1,5 @@
 import "server-only";
+import { getAppUrl } from "@/lib/site";
 
 type IntaSendChargeInput = {
   amount: number;
@@ -102,10 +103,7 @@ export async function getInvoiceStatus(invoiceId: string) {
 }
 
 export function siteHost() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(
-    /\/$/,
-    "",
-  );
+  return getAppUrl();
 }
 
 export function parsePaidAmount(value: string | number | undefined) {

@@ -5,8 +5,10 @@ import { Footer } from "@/components/layout/footer";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { SiteMain } from "@/components/layout/site-main";
 import { Providers } from "@/components/providers";
-import { siteConfig } from "@/lib/site";
+import { getAppUrl, siteConfig } from "@/lib/site";
 import "./globals.css";
+
+const appUrl = getAppUrl();
 
 const sora = Sora({
   subsets: ["latin"],
@@ -21,7 +23,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteConfig.url),
+  metadataBase: new URL(appUrl),
   title: {
     default: `${siteConfig.name} | ${siteConfig.tagline}`,
     template: `%s | ${siteConfig.name}`,

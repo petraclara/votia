@@ -1,9 +1,15 @@
+export function getAppUrl() {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000"
+  ).replace(/\/$/, "");
+}
+
 export const siteConfig = {
   name: "Votia",
   tagline: "Vote. Support. Celebrate.",
   description:
     "Discover competitions, support your favourite contestants and securely vote online. Votia provides digital voting and event ticketing across Kenya.",
-  url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  url: getAppUrl(),
   contact: {
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "hello@votia.co.ke",
     phone: process.env.NEXT_PUBLIC_CONTACT_PHONE ?? "+254 700 000 000",
