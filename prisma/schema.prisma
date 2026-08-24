@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ORGANIZER
+  ADMIN
+}
+
+enum OrganizerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+enum EventStatus {
+  DRAFT
+  UPCOMING
+  LIVE
+  COMPLETED
+  DISABLED
+}
+
+enum EventMode {
+  VOTING_ONLY
+  TICKETS_ONLY
+  VOTING_AND_TICKETS
+}
+
+enum VoteVisibility {
+  VISIBLE
+  HIDDEN
+  AFTER_CLOSE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum SettlementStatus {
+  PENDING
+  PARTIALLY_SETTLED
+  SETTLED
+  DISPUTED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(USER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  organizer    Organizer?
+}
+
+model Organizer {
+  id               String          @id @default(cuid())
+  userId           String          @unique
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationName String
+  phone            String
+  status           OrganizerStatus @default(PENDING)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  events           Event[]
+  settlements      Settlement[]
+}
+
+model Event {
+  id               String            @id @default(cuid())
+  organizerId      String
+  organizer        Organizer         @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String            @unique
+  description      String            @db.Text
+  poster           String
+  banner           String
+  location         String
+  venue            String
+  eventDate        DateTime
+  votingStart      DateTime?
+  votingEnd        DateTime?
+  status           EventStatus       @default(DRAFT)
+  mode             EventMode         @default(VOTING_ONLY)
+  votePrice        Int               @default(10)
+  ticketingEnabled Boolean           @default(false)
+  voteVisibility   VoteVisibility    @default(AFTER_CLOSE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  contestants      Contestant[]
+  tickets          Ticket[]
+  voteTransactions VoteTransaction[]
+  ticketOrders     TicketOrder[]
+  settlements      Settlement[]
+
+  @@index([status, eventDate])
+  @@index([slug])
+}
+
+model Contestant {
+  id               String            @id @default(cuid())
+  eventId          String
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String
+  contestantNumber String
+  category         String
+  bio              String            @db.Text
+  image            String
+  voteCount        Int               @default(0)
+  instagram        String?
+  twitter          String?
+  tiktok           String?
+  facebook         String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  voteTransactions VoteTransaction[]
+
+  @@unique([eventId, slug])
+  @@unique([eventId, contestantNumber])
+  @@index([eventId])
+}
+
+model VoteTransaction {
+  id                String        @id @default(cuid())
+  eventId           String
+  event             Event         @relation(fields: [eventId], references: [id])
+  contestantId      String
+  contestant        Contestant    @relation(fields: [contestantId], references: [id])
+  voteQuantity      Int
+  amount            Int
+  currency          String        @default("KES")
+  intasendInvoiceId String?
+  intasendReference String?       @unique
+  apiRef            String        @unique
+  processingFee     Int           @default(0)
+  status            PaymentStatus @default(PENDING)
+  processed         Boolean       @default(false)
+  customerEmail     String?
+  customerPhone     String?
+  customerName      String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([eventId, status])
+  @@index([contestantId, status])
+  @@index([processed, status])
+}
+
+model Ticket {
+  id        String        @id @default(cuid())
+  eventId   String
+  event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name      String
+  price     Int
+  quantity  Int
+  sold      Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  orders    TicketOrder[]
+}
+
+model TicketOrder {
+  id                String        @id @default(cuid())
+  eventId           String
+  event             Event         @relation(fields: [eventId], references: [id])
+  ticketId          String
+  ticket            Ticket        @relation(fields: [ticketId], references: [id])
+  quantity          Int
+  amount            Int
+  currency          String        @default("KES")
+  intasendInvoiceId String?
+  intasendReference String?       @unique
+  apiRef            String        @unique
+  processingFee     Int           @default(0)
+  status            PaymentStatus @default(PENDING)
+  processed         Boolean       @default(false)
+  customerName      String
+  customerPhone     String
+  customerEmail     String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([eventId, status])
+}
+
+model Settlement {
+  id                  String           @id @default(cuid())
+  organizerId         String
+  organizer           Organizer        @relation(fields: [organizerId], references: [id])
+  eventId             String
+  event               Event            @relation(fields: [eventId], references: [id])
+  grossAmount         Int
+  processingFees      Int              @default(0)
+  platformFee         Int              @default(0)
+  organizerAmount     Int
+  payoutFee           Int              @default(0)
+  amountPaid          Int              @default(0)
+  paymentMethod       String?
+  settlementReference String?
+  status              SettlementStatus @default(PENDING)
+  createdAt           DateTime         @default(now())
+  paidAt              DateTime?
+
+  @@index([organizerId, status])
+  @@index([eventId])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  invoiceId String?
+  apiRef    String?
+  state     String?
+  payload   Json
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([apiRef])
+  @@index([invoiceId])
+}
