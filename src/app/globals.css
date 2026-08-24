@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+:root {
+  --navy: #071a2b;
+  --navy-light: #0d2b44;
+  --navy-muted: #16344f;
+  --teal: #00c2b8;
+  --teal-dark: #009e96;
+  --teal-soft: #e6faf8;
+  --white: #ffffff;
+  --bg: #f5f8fa;
+  --text: #101820;
+  --muted: #5b6b79;
+  --border: #d7e0e7;
+  --danger: #e11d48;
+  --warning: #f59e0b;
+  --success: #059669;
+  --shadow: 0 18px 50px rgba(7, 26, 43, 0.12);
+}
+
+@theme inline {
+  --color-navy: var(--navy);
+  --color-navy-light: var(--navy-light);
+  --color-navy-muted: var(--navy-muted);
+  --color-teal: var(--teal);
+  --color-teal-dark: var(--teal-dark);
+  --color-teal-soft: var(--teal-soft);
+  --color-bg: var(--bg);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --font-display: var(--font-sora);
+  --font-sans: var(--font-manrope);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-manrope), system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-sora), system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+::selection {
+  background: var(--teal);
+  color: var(--navy);
+}
+
+.container-px {
+  width: min(1120px, calc(100% - 1.5rem));
+  margin-inline: auto;
+}
+
+@media (min-width: 768px) {
+  .container-px {
+    width: min(1120px, calc(100% - 2.5rem));
+  }
+}
