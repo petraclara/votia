@@ -1,15 +1,27 @@
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { canUploadEventMedia, validateImageUploadFile } from "@/lib/authz";
+import { requireOrganizer } from "@/lib/session";
+import { storePublicImage } from "@/lib/storage";
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session?.user || (session.user.role !== "ORGANIZER" && session.user.role !== "ADMIN")) {
+  let organizer;
+  try {
+    organizer = await requireOrganizer();
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.role === "ORGANIZER" && session.user.organizerStatus !== "APPROVED") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { user, organizer: profile } = organizer;
+  if (
+    !canUploadEventMedia({
+      role: user.role,
+      organizerStatus: profile?.status ?? null,
+    })
+  ) {
+    return NextResponse.json(
+      { error: "Organizer account must be approved before uploading images." },
+      { status: 403 },
+    );
   }
 
   const formData = await request.formData();
@@ -17,24 +29,38 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing file" }, { status: 400 });
   }
-  if (file.size > 4_000_000) {
-    return NextResponse.json({ error: "File too large" }, { status: 400 });
-  }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "Images only" }, { status: 400 });
+
+  const validation = validateImageUploadFile({
+    size: file.size,
+    type: file.type,
+    name: file.name,
+  });
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error }, { status: validation.status });
   }
 
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-  const allowed = ["jpg", "jpeg", "png", "webp"];
-  if (!allowed.includes(ext)) {
-    return NextResponse.json({ error: "Unsupported image type" }, { status: 400 });
-  }
-
-  const filename = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
+  const filename = `${Date.now()}-${crypto.randomUUID()}.${validation.ext}`;
   const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadDir, filename), bytes);
 
-  return NextResponse.json({ url: `/uploads/${filename}` });
+  try {
+    const stored = await storePublicImage({
+      bytes,
+      filename,
+      contentType: file.type || `image/${validation.ext}`,
+    });
+    return NextResponse.json({ url: stored.url, provider: stored.provider });
+  } catch (error) {
+    console.error("Image upload failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to store image. Configure Cloudinary credentials.",
+      },
+      { status: 503 },
+    );
+  }
 }

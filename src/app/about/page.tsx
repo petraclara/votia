@@ -23,7 +23,7 @@ export default function AboutPage() {
       </h1>
       <p className="mt-5 max-w-2xl text-lg text-muted">
         Votia helps organizers run fair competitions and helps fans support the people they
-        believe in. Payments are processed through IntaSend, and votes are credited only after
+        believe in. Payments use M-Pesa STK Push via Safaricom Daraja, and votes are credited only after
         the backend confirms a successful transaction.
       </p>
       <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -133,29 +133,30 @@ model Contestant {
 }
 
 model VoteTransaction {
-  id                String        @id @default(cuid())
-  eventId           String
-  event             Event         @relation(fields: [eventId], references: [id])
-  contestantId      String
-  contestant        Contestant    @relation(fields: [contestantId], references: [id])
-  voteQuantity      Int
-  amount            Int
-  currency          String        @default("KES")
-  intasendInvoiceId String?
-  intasendReference String?       @unique
-  apiRef            String        @unique
-  processingFee     Int           @default(0)
-  status            PaymentStatus @default(PENDING)
-  processed         Boolean       @default(false)
-  customerEmail     String?
-  customerPhone     String?
-  customerName      String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  eventId               String
+  event                 Event         @relation(fields: [eventId], references: [id])
+  contestantId          String
+  contestant            Contestant    @relation(fields: [contestantId], references: [id])
+  voteQuantity          Int
+  amount                Int
+  currency              String        @default("KES")
+  mpesaCheckoutRequestId String?
+  mpesaReceiptNumber    String?       @unique
+  apiRef                String        @unique
+  processingFee         Int           @default(0)
+  status                PaymentStatus @default(PENDING)
+  processed             Boolean       @default(false)
+  customerEmail         String?
+  customerPhone         String?
+  customerName          String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   @@index([eventId, status])
   @@index([contestantId, status])
   @@index([processed, status])
+  @@index([mpesaCheckoutRequestId])
 }
 
 model Ticket {
@@ -172,27 +173,28 @@ model Ticket {
 }
 
 model TicketOrder {
-  id                String        @id @default(cuid())
-  eventId           String
-  event             Event         @relation(fields: [eventId], references: [id])
-  ticketId          String
-  ticket            Ticket        @relation(fields: [ticketId], references: [id])
-  quantity          Int
-  amount            Int
-  currency          String        @default("KES")
-  intasendInvoiceId String?
-  intasendReference String?       @unique
-  apiRef            String        @unique
-  processingFee     Int           @default(0)
-  status            PaymentStatus @default(PENDING)
-  processed         Boolean       @default(false)
-  customerName      String
-  customerPhone     String
-  customerEmail     String
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  eventId               String
+  event                 Event         @relation(fields: [eventId], references: [id])
+  ticketId              String
+  ticket                Ticket        @relation(fields: [ticketId], references: [id])
+  quantity              Int
+  amount                Int
+  currency              String        @default("KES")
+  mpesaCheckoutRequestId String?
+  mpesaReceiptNumber    String?       @unique
+  apiRef                String        @unique
+  processingFee         Int           @default(0)
+  status                PaymentStatus @default(PENDING)
+  processed             Boolean       @default(false)
+  customerName          String
+  customerPhone         String
+  customerEmail         String
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   @@index([eventId, status])
+  @@index([mpesaCheckoutRequestId])
 }
 
 model Settlement {

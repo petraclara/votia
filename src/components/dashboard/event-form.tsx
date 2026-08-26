@@ -14,15 +14,26 @@ export function ImageField({
 }) {
   const [url, setUrl] = useState(defaultValue ?? "");
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function upload(file: File) {
     setUploading(true);
+    setError(null);
     const data = new FormData();
     data.append("file", file);
-    const response = await fetch("/api/upload", { method: "POST", body: data });
-    const json = await response.json();
-    setUploading(false);
-    if (json.url) setUrl(json.url);
+    try {
+      const response = await fetch("/api/upload", { method: "POST", body: data });
+      const json = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !json.url) {
+        setError(json.error ?? "Upload failed.");
+        return;
+      }
+      setUrl(json.url);
+    } catch {
+      setError("Upload failed.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -32,12 +43,12 @@ export function ImageField({
       <input
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="Image URL"
+        placeholder="Image URL or upload a file"
         className="mt-1 h-12 w-full rounded-2xl border border-border px-4 font-normal"
       />
       <input
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
         className="mt-2 text-sm font-normal"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -45,6 +56,11 @@ export function ImageField({
         }}
       />
       {uploading ? <p className="text-xs text-muted">Uploading...</p> : null}
+      {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="mt-3 h-28 w-full rounded-2xl object-cover" />
+      ) : null}
     </label>
   );
 }

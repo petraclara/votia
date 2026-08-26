@@ -63,7 +63,7 @@ async function main() {
       poster:
         "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80",
       banner:
-        "https://images.unsplash.com/photo-1492684223066-81342eea52d3?auto=format&fit=crop&w=1800&q=80",
+        "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1800&q=80",
       location: "Nairobi",
       venue: "KICC Grand Ballroom",
       eventDate: new Date("2026-09-27T18:00:00+03:00"),
@@ -85,7 +85,7 @@ async function main() {
       description:
         "A runway celebration of designers, models and creative directors shaping East African fashion.",
       poster:
-        "https://images.unsplash.com/photo-1469334031218-e4a394c2b19e?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80",
       banner:
         "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1800&q=80",
       location: "Nairobi",

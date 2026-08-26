@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { fulfillPaymentByApiRef } from "@/lib/payments/fulfill";
 import { formatKes } from "@/lib/utils";
 import { ButtonLink } from "@/components/ui/button";
 import { ShareButtons } from "@/components/events/share-buttons";
+import { PaymentStatusPoller } from "@/components/payments/payment-status-poller";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +26,7 @@ export default async function PaymentSuccessPage({
     );
   }
 
-  if (process.env.INTASEND_PUBLIC_KEY && process.env.INTASEND_SECRET_KEY) {
-    await fulfillPaymentByApiRef(ref).catch(() => null);
-  }
+  // DB read only — reconciliation/STK Query runs exclusively via /api/payments/status.
 
   if (ref.startsWith("vote_")) {
     const transaction = await prisma.voteTransaction.findUnique({
@@ -66,7 +64,10 @@ export default async function PaymentSuccessPage({
               <Row label="Contestant" value={transaction.contestant.name} />
               <Row label="Votes purchased" value={String(transaction.voteQuantity)} />
               <Row label="Amount paid" value={formatKes(transaction.amount)} />
-              <Row label="Payment reference" value={transaction.intasendReference ?? transaction.apiRef} />
+              <Row
+                label="M-Pesa receipt"
+                value={transaction.mpesaReceiptNumber ?? transaction.apiRef}
+              />
               <Row label="Event" value={transaction.event.name} />
             </dl>
             <div className="mt-6 flex flex-col gap-3">
@@ -91,12 +92,8 @@ export default async function PaymentSuccessPage({
     return (
       <StatusCard
         title="Confirming your payment"
-        body="IntaSend is verifying this transaction. Votes are added only after the payment is confirmed. Refresh this page in a moment."
-        extra={
-          <Link href={`/payment/success?ref=${ref}`} className="font-semibold text-navy">
-            Refresh status
-          </Link>
-        }
+        body="Check your phone for the M-Pesa prompt and enter your PIN."
+        extra={<PaymentStatusPoller apiRef={ref} initialStatus={transaction.status} />}
       />
     );
   }
@@ -113,6 +110,9 @@ export default async function PaymentSuccessPage({
       <StatusCard
         title="Payment did not complete"
         body="No tickets were issued. You can return to the event and try again."
+        extra={
+          <ButtonLink href={`/events/${order.event.slug}`}>Try again</ButtonLink>
+        }
       />
     );
   }
@@ -126,7 +126,7 @@ export default async function PaymentSuccessPage({
           </p>
           <dl className="mt-6 space-y-2 text-left text-sm">
             <Row label="Amount paid" value={formatKes(order.amount)} />
-            <Row label="Payment reference" value={order.intasendReference ?? order.apiRef} />
+            <Row label="M-Pesa receipt" value={order.mpesaReceiptNumber ?? order.apiRef} />
           </dl>
           <ButtonLink href={`/events/${order.event.slug}`} className="mt-6">
             View Event
@@ -138,7 +138,8 @@ export default async function PaymentSuccessPage({
   return (
     <StatusCard
       title="Confirming your ticket payment"
-      body="Tickets are issued only after IntaSend confirms the payment."
+      body="Check your phone for the M-Pesa prompt and enter your PIN."
+      extra={<PaymentStatusPoller apiRef={ref} initialStatus={order.status} />}
     />
   );
 }
@@ -167,6 +168,11 @@ function StatusCard({
         <h1 className="text-3xl font-semibold text-navy">{title}</h1>
         <p className="mt-3 text-muted">{body}</p>
         {extra ? <div className="mt-4">{extra}</div> : null}
+        <p className="mt-4 text-xs text-muted">
+          <Link href="/" className="font-semibold text-navy">
+            Back home
+          </Link>
+        </p>
       </div>
     </div>
   );

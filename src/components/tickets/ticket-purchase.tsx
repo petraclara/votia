@@ -26,6 +26,10 @@ export function TicketPurchase({
 
   function pay() {
     setError(null);
+    if (!customerPhone.trim()) {
+      setError("Enter your M-Pesa phone number.");
+      return;
+    }
     startTransition(async () => {
       const response = await fetch("/api/payments/tickets", {
         method: "POST",
@@ -44,7 +48,7 @@ export function TicketPurchase({
         setError(data.error ?? "Unable to start payment.");
         return;
       }
-      window.location.href = data.checkoutUrl;
+      window.location.href = `/payment/success?ref=${encodeURIComponent(data.apiRef)}`;
     });
   }
 
@@ -95,7 +99,9 @@ export function TicketPurchase({
           required
           value={customerPhone}
           onChange={(e) => setCustomerPhone(e.target.value)}
-          placeholder="Phone"
+          placeholder="M-Pesa phone"
+          inputMode="tel"
+          autoComplete="tel"
           className="h-12 rounded-2xl border border-border px-4"
         />
         <input
@@ -110,8 +116,11 @@ export function TicketPurchase({
       <p className="mt-4 text-lg font-semibold text-navy">Total {formatKes(total)}</p>
       {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
       <Button className="mt-4 w-full" size="lg" onClick={pay} disabled={pending || remaining < 1}>
-        {pending ? "Starting payment..." : `Pay ${formatKes(total)}`}
+        {pending ? "Sending M-Pesa prompt..." : `Pay ${formatKes(total)}`}
       </Button>
+      <p className="mt-3 text-center text-xs text-muted">
+        You will get an M-Pesa STK prompt on your phone. Tickets are issued only after payment is confirmed.
+      </p>
     </div>
   );
 }

@@ -13,14 +13,14 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "test": "tsx --test src/lib/payments/money.test.ts src/lib/payments/security.test.ts"
+    "test": "tsx --test src/lib/payments/money.test.ts src/lib/payments/security.test.ts src/lib/payments/phone.test.ts src/lib/payments/daraja.test.ts src/lib/authz.test.ts src/lib/storage-config.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.13.0",
     "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.10.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "intasend-node": "^1.1.2",
     "lucide-react": "^0.539.0",
     "next": "^15.4.6",
     "next-auth": "^4.24.11",
@@ -32,11 +32,11 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@eslint/eslintrc": "^3.3.1",
     "eslint": "^9",
     "eslint-config-next": "^15.4.6",
     "prisma": "^6.13.0",

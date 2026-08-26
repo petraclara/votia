@@ -1,14 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { webhookChallengeValid } from "./webhook";
 import { canAccessAdminFinance, canManageOrganizerEvent } from "../authz";
-
-test("webhook challenge must match exactly", () => {
-  assert.equal(webhookChallengeValid("secret", "secret"), true);
-  assert.equal(webhookChallengeValid("secret", "other"), false);
-  assert.equal(webhookChallengeValid("secret", undefined), false);
-  assert.equal(webhookChallengeValid(null, "secret"), false);
-});
+import { normalizeMpesaPhone } from "./phone";
+import { mapDarajaResultToState } from "./daraja-utils";
 
 test("organizers cannot manage another organizer event by id", () => {
   assert.equal(
@@ -33,4 +27,9 @@ test("financial data is admin-only", () => {
   assert.equal(canAccessAdminFinance("ORGANIZER"), false);
   assert.equal(canAccessAdminFinance("ADMIN"), true);
   assert.equal(canAccessAdminFinance("USER"), false);
+});
+
+test("cancelled STK results never look like COMPLETE", () => {
+  assert.notEqual(mapDarajaResultToState(1032), "COMPLETE");
+  assert.equal(normalizeMpesaPhone("0712345678")?.startsWith("254"), true);
 });

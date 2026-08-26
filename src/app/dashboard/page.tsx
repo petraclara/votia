@@ -50,11 +50,19 @@ export default async function DashboardPage() {
           <h1 className="text-3xl font-semibold text-navy">Overview</h1>
           <p className="text-sm text-muted">
             {organizer?.status === "PENDING"
-              ? "Your organizer account is awaiting approval."
-              : "Track events, contestants and votes."}
+              ? "Your organizer account is awaiting approval. You cannot create events until an admin approves you."
+              : organizer?.status === "SUSPENDED"
+                ? "Your organizer account is suspended."
+                : "Track events, contestants and votes."}
           </p>
         </div>
-        <ButtonLink href="/dashboard/events/new">Create event</ButtonLink>
+        {organizer?.status === "APPROVED" || user.role === "ADMIN" ? (
+          <ButtonLink href="/dashboard/events/new">Create event</ButtonLink>
+        ) : (
+          <span className="rounded-full bg-bg px-4 py-2 text-sm font-semibold text-muted">
+            Create event locked
+          </span>
+        )}
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

@@ -7,10 +7,16 @@ import { requireAdmin } from "@/lib/session";
 import { getEventLedger } from "@/lib/finance";
 import { settlementStatusFromAmounts } from "@/lib/payments/money";
 
-export async function setOrganizerStatusAction(organizerId: string, status: "PENDING" | "APPROVED" | "SUSPENDED") {
+export async function setOrganizerStatusAction(
+  organizerId: string,
+  status: "PENDING" | "APPROVED" | "SUSPENDED",
+) {
   await requireAdmin();
   await prisma.organizer.update({ where: { id: organizerId }, data: { status } });
   revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/events");
+  revalidatePath("/dashboard/events/new");
 }
 
 export async function disableEventAction(eventId: string) {

@@ -69,6 +69,10 @@ export function VoteForm({ contestant, event }: { contestant: Contestant; event:
 
   function pay() {
     setError(null);
+    if (!phone.trim()) {
+      setError("Enter your M-Pesa phone number.");
+      return;
+    }
     startTransition(async () => {
       const response = await fetch("/api/payments/votes", {
         method: "POST",
@@ -87,7 +91,7 @@ export function VoteForm({ contestant, event }: { contestant: Contestant; event:
         setError(data.error ?? "Unable to start payment.");
         return;
       }
-      window.location.href = data.checkoutUrl;
+      window.location.href = `/payment/success?ref=${encodeURIComponent(data.apiRef)}`;
     });
   }
 
@@ -171,7 +175,10 @@ export function VoteForm({ contestant, event }: { contestant: Contestant; event:
         <input
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          placeholder="M-Pesa phone (optional)"
+          placeholder="M-Pesa phone (required)"
+          required
+          inputMode="tel"
+          autoComplete="tel"
           className="h-12 rounded-2xl border border-border px-4"
         />
         <input
@@ -186,10 +193,10 @@ export function VoteForm({ contestant, event }: { contestant: Contestant; event:
       {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
 
       <Button className="mt-5 w-full" size="lg" onClick={pay} disabled={pending || quantity < 1}>
-        {pending ? "Starting payment..." : `Pay ${formatKes(total)}`}
+        {pending ? "Sending M-Pesa prompt..." : `Pay ${formatKes(total)}`}
       </Button>
       <p className="mt-3 text-center text-xs text-muted">
-        Votes are added only after IntaSend confirms a successful payment.
+        You will get an M-Pesa STK prompt on your phone. Votes are added only after payment is confirmed.
       </p>
     </div>
   );

@@ -19,7 +19,7 @@ const steps = [
   },
   {
     title: "Pay Securely",
-    body: "Complete payment through IntaSend.",
+    body: "Complete payment with M-Pesa STK Push.",
     icon: ShieldCheck,
   },
 ];

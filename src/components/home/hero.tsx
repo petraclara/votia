@@ -5,7 +5,7 @@ export function Hero() {
   return (
     <section className="relative isolate overflow-hidden bg-navy text-white">
       <Image
-        src="https://images.unsplash.com/photo-1492684223066-81342eea52d3?auto=format&fit=crop&w=2000&q=80"
+        src="https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=2000&q=80"
         alt="Audience celebrating at a live event"
         fill
         priority

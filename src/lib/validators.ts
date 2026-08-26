@@ -5,7 +5,7 @@ export const voteCheckoutSchema = z.object({
   eventId: z.string().min(1),
   voteQuantity: z.coerce.number().int().min(1).max(10_000),
   customerEmail: z.string().email().optional().or(z.literal("")),
-  customerPhone: z.string().max(20).optional().or(z.literal("")),
+  customerPhone: z.string().min(9).max(20),
   customerName: z.string().max(80).optional().or(z.literal("")),
 });
 

@@ -62,7 +62,7 @@ export function Footer() {
       <div className="border-t border-white/10">
         <div className="container-px flex flex-col gap-2 py-5 text-xs text-white/50 md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} Votia. All rights reserved.</p>
-          <p>Payments processed securely with IntaSend.</p>
+          <p>Payments processed securely with M-Pesa (Daraja).</p>
         </div>
       </div>
     </footer>

@@ -2,14 +2,15 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getVotingState } from "@/lib/events";
-import { createCheckout, isIntaSendConfigured, siteHost } from "@/lib/payments/intasend";
+import { initiateStkPush, isDarajaConfigured } from "@/lib/payments/daraja";
+import { normalizeMpesaPhone } from "@/lib/payments/phone";
 import { calculateVoteTotal } from "@/lib/payments/money";
 import { voteCheckoutSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
-  if (!isIntaSendConfigured()) {
+  if (!isDarajaConfigured()) {
     return NextResponse.json(
-      { error: "Payments are not configured. Add IntaSend keys on the server." },
+      { error: "Payments are not configured. Add Daraja credentials on the server." },
       { status: 503 },
     );
   }
@@ -17,6 +18,14 @@ export async function POST(request: Request) {
   const parsed = voteCheckoutSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid vote request." }, { status: 400 });
+  }
+
+  const phone = normalizeMpesaPhone(parsed.data.customerPhone);
+  if (!phone) {
+    return NextResponse.json(
+      { error: "Enter a valid Kenyan M-Pesa phone number (e.g. 07XXXXXXXX)." },
+      { status: 400 },
+    );
   }
 
   const contestant = await prisma.contestant.findUnique({
@@ -40,8 +49,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid vote quantity or price." }, { status: 400 });
   }
   const apiRef = `vote_${randomUUID()}`;
-  const firstName = parsed.data.customerName?.split(" ")[0];
-  const lastName = parsed.data.customerName?.split(" ").slice(1).join(" ");
 
   const transaction = await prisma.voteTransaction.create({
     data: {
@@ -54,36 +61,52 @@ export async function POST(request: Request) {
       status: "PENDING",
       processed: false,
       customerEmail: parsed.data.customerEmail || null,
-      customerPhone: parsed.data.customerPhone || null,
+      customerPhone: phone,
       customerName: parsed.data.customerName || null,
     },
   });
 
   try {
-    const checkout = await createCheckout({
+    const stk = await initiateStkPush({
       amount,
-      currency: "KES",
-      api_ref: apiRef,
-      email: parsed.data.customerEmail || undefined,
-      phone_number: parsed.data.customerPhone || undefined,
-      first_name: firstName,
-      last_name: lastName,
-      comment: `${parsed.data.voteQuantity} votes for ${contestant.name}`,
-      redirect_url: `${siteHost()}/payment/success?ref=${apiRef}`,
+      phone,
+      apiRef,
+      description: `Votes ${contestant.name}`.slice(0, 13),
     });
 
     await prisma.voteTransaction.update({
       where: { id: transaction.id },
-      data: { intasendInvoiceId: checkout.invoiceId },
+      data: { mpesaCheckoutRequestId: stk.checkoutRequestId },
     });
 
-    return NextResponse.json({ checkoutUrl: checkout.checkoutUrl, apiRef });
+    return NextResponse.json({
+      apiRef,
+      checkoutRequestId: stk.checkoutRequestId,
+      message:
+        "Check your phone for the M-Pesa prompt and enter your PIN.",
+    });
   } catch (error) {
     await prisma.voteTransaction.update({
       where: { id: transaction.id },
       data: { status: "FAILED" },
     });
-    console.error("IntaSend vote checkout failed", error);
-    return NextResponse.json({ error: "Unable to start IntaSend checkout." }, { status: 502 });
+    console.error("Daraja vote STK Push failed", {
+      apiRef,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message.includes("CallBackURL") ||
+              error.message.includes("callback") ||
+              error.message.includes("phone") ||
+              error.message.includes("DARAJA_CALLBACK")
+              ? error.message
+              : "Unable to start M-Pesa payment. Please try again."
+            : "Unable to start M-Pesa payment. Please try again.",
+      },
+      { status: 502 },
+    );
   }
 }

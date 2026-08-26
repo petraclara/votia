@@ -48,6 +48,17 @@ export const authOptions: NextAuthOptions = {
         token.organizerId = user.organizerId;
         token.organizerStatus = user.organizerStatus;
       }
+
+      // Refresh organizer approval from DB so admin Approve takes effect without re-login.
+      if (token.id && token.role === "ORGANIZER") {
+        const organizer = await prisma.organizer.findUnique({
+          where: { userId: token.id as string },
+          select: { id: true, status: true },
+        });
+        token.organizerId = organizer?.id ?? null;
+        token.organizerStatus = organizer?.status ?? null;
+      }
+
       return token;
     },
     async session({ session, token }) {

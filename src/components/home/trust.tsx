@@ -3,7 +3,7 @@ import { Lock, Smartphone, Sparkles, Vote } from "lucide-react";
 const items = [
   {
     title: "Secure Payments",
-    body: "Checkout is handled by IntaSend. Votes are only added after payment is verified on the server.",
+    body: "Checkout uses Safaricom Daraja M-Pesa STK Push. Votes are only added after payment is verified on the server.",
     icon: Lock,
   },
   {
@@ -45,7 +45,7 @@ export function TrustSection() {
           ))}
         </div>
         <p className="mt-8 text-center text-xs text-white/50">
-          Payments are processed by IntaSend. Votia never stores card details.
+          Payments are processed with M-Pesa via Safaricom Daraja. Votia never stores card details.
         </p>
       </div>
     </section>

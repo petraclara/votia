@@ -2,13 +2,14 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isTicketingOpen } from "@/lib/events";
-import { createCheckout, isIntaSendConfigured, siteHost } from "@/lib/payments/intasend";
+import { initiateStkPush, isDarajaConfigured } from "@/lib/payments/daraja";
+import { normalizeMpesaPhone } from "@/lib/payments/phone";
 import { ticketCheckoutSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
-  if (!isIntaSendConfigured()) {
+  if (!isDarajaConfigured()) {
     return NextResponse.json(
-      { error: "Payments are not configured. Add IntaSend keys on the server." },
+      { error: "Payments are not configured. Add Daraja credentials on the server." },
       { status: 503 },
     );
   }
@@ -16,6 +17,14 @@ export async function POST(request: Request) {
   const parsed = ticketCheckoutSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid ticket request." }, { status: 400 });
+  }
+
+  const phone = normalizeMpesaPhone(parsed.data.customerPhone);
+  if (!phone) {
+    return NextResponse.json(
+      { error: "Enter a valid Kenyan M-Pesa phone number (e.g. 07XXXXXXXX)." },
+      { status: 400 },
+    );
   }
 
   const ticket = await prisma.ticket.findUnique({
@@ -46,36 +55,52 @@ export async function POST(request: Request) {
       status: "PENDING",
       processed: false,
       customerName: parsed.data.customerName,
-      customerPhone: parsed.data.customerPhone,
+      customerPhone: phone,
       customerEmail: parsed.data.customerEmail,
     },
   });
 
   try {
-    const checkout = await createCheckout({
+    const stk = await initiateStkPush({
       amount,
-      currency: "KES",
-      api_ref: apiRef,
-      email: parsed.data.customerEmail,
-      phone_number: parsed.data.customerPhone,
-      first_name: parsed.data.customerName.split(" ")[0],
-      last_name: parsed.data.customerName.split(" ").slice(1).join(" "),
-      comment: `${parsed.data.quantity} × ${ticket.name} for ${ticket.event.name}`,
-      redirect_url: `${siteHost()}/payment/success?ref=${apiRef}`,
+      phone,
+      apiRef,
+      description: `Tickets ${ticket.name}`.slice(0, 13),
     });
 
     await prisma.ticketOrder.update({
       where: { id: order.id },
-      data: { intasendInvoiceId: checkout.invoiceId },
+      data: { mpesaCheckoutRequestId: stk.checkoutRequestId },
     });
 
-    return NextResponse.json({ checkoutUrl: checkout.checkoutUrl, apiRef });
+    return NextResponse.json({
+      apiRef,
+      checkoutRequestId: stk.checkoutRequestId,
+      message:
+        "Check your phone for the M-Pesa prompt and enter your PIN.",
+    });
   } catch (error) {
     await prisma.ticketOrder.update({
       where: { id: order.id },
       data: { status: "FAILED" },
     });
-    console.error("IntaSend ticket checkout failed", error);
-    return NextResponse.json({ error: "Unable to start IntaSend checkout." }, { status: 502 });
+    console.error("Daraja ticket STK Push failed", {
+      apiRef,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message.includes("CallBackURL") ||
+              error.message.includes("callback") ||
+              error.message.includes("phone") ||
+              error.message.includes("DARAJA_CALLBACK")
+              ? error.message
+              : "Unable to start M-Pesa payment. Please try again."
+            : "Unable to start M-Pesa payment. Please try again.",
+      },
+      { status: 502 },
+    );
   }
 }

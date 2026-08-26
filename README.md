@@ -9,7 +9,7 @@ Votia is a production-oriented voting and ticketing platform for pageants, award
 - Next.js App Router, TypeScript, Tailwind CSS
 - PostgreSQL + Prisma
 - NextAuth credentials auth with `USER`, `ORGANIZER`, and `ADMIN` roles
-- IntaSend checkout + webhook fulfilment for votes and tickets
+- Safaricom Daraja M-Pesa STK Push + callback fulfilment for votes and tickets
 
 ## Setup
 
@@ -18,6 +18,8 @@ Votia is a production-oriented voting and ticketing platform for pageants, award
 ```bash
 copy .env.example .env
 ```
+
+Use `.env.local` for local secrets if you prefer. Do not commit real Daraja credentials.
 
 2. Start PostgreSQL. Docker Desktop must be running first.
 
@@ -50,27 +52,97 @@ Open [http://localhost:3000](http://localhost:3000).
 - Admin: `admin@votia.co.ke` / `Admin123!`
 - Organizer: `organizer@votia.co.ke` / `Organizer123!`
 
-## IntaSend
+## Daraja (M-Pesa STK Push)
 
-Payments are initiated only on the server. Votes and tickets are **not** credited when a user clicks Pay.
+Payments are initiated only on the server. Votes and tickets are **not** credited when STK Push is merely started.
 
-1. Create a sandbox app at [IntaSend](https://intasend.com/).
-2. Set `INTASEND_PUBLIC_KEY`, `INTASEND_SECRET_KEY`, and `INTASEND_TEST_MODE=true`.
-3. In the IntaSend dashboard, add webhook URL:
+1. Create a sandbox app in the [Safaricom Daraja portal](https://developer.safaricom.co.ke/) and enable **Lipa Na M-Pesa Online**.
+2. Copy your **Consumer Key** and **Consumer Secret** into `.env` / `.env.local` (never commit them).
+3. The portal often shows Passkey / Short Code as **N/A** in sandbox. Use Safaricom’s public Lipa Na M-Pesa Online sandbox test values in env (see `.env.example`):
 
-`https://your-domain/api/webhooks/intasend`
+```text
+DARAJA_CONSUMER_KEY=your_key
+DARAJA_CONSUMER_SECRET=your_secret
+DARAJA_PASSKEY=bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919
+DARAJA_SHORTCODE=174379
+DARAJA_ENV=sandbox
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXTAUTH_URL=http://localhost:3000
+```
 
-4. Set `INTASEND_WEBHOOK_CHALLENGE` to the same challenge string.
+4. Callback URL (server-only) — **required for STK Push**:
 
-The webhook:
+Safaricom rejects `http://localhost` as `CallBackURL` (`400.002.02 Invalid CallBackURL`).
 
-- validates the challenge
-- stores the payload
-- verifies the invoice through the IntaSend status API
-- checks amount and currency
-- credits votes or tickets once, using an idempotent `processed` flag
+- Keep the app on `NEXT_PUBLIC_APP_URL=http://localhost:3000`
+- Set a separate public HTTPS callback:
 
-The `/payment/success` page only displays a success state after the backend has marked the transaction as paid. It may call IntaSend again to reconcile a delayed webhook. It never trusts a frontend redirect on its own.
+```text
+DARAJA_CALLBACK_URL=https://your-tunnel-or-vercel-host/api/webhooks/daraja
+```
+
+Quick local tunnel (while `npm run dev` is running):
+
+```bash
+npx cloudflared tunnel --url http://localhost:3000
+```
+
+Copy the `https://….trycloudflare.com` URL into `DARAJA_CALLBACK_URL` (append `/api/webhooks/daraja` if you only paste the origin), restart `npm run dev`, then pay again.
+
+If you already have Votia on Vercel with the same database, you can point `DARAJA_CALLBACK_URL` at:
+
+`https://your-app.vercel.app/api/webhooks/daraja`
+
+Payment confirmation on localhost still works via **STK Query polling** on `/payment/success` even when the callback is delayed.
+
+5. Optional:
+
+```text
+DARAJA_TRANSACTION_TYPE=CustomerPayBillOnline
+DARAJA_PARTY_B=
+DARAJA_CALLBACK_URL=
+```
+
+Switching to production: set `DARAJA_ENV=production`, your live Consumer Key/Secret, Go-Live shortcode + passkey, and `NEXT_PUBLIC_APP_URL` / `NEXTAUTH_URL` to the Vercel HTTPS origin. Remove or update `DARAJA_CALLBACK_URL` so it points at production.
+
+### Fulfilment rules
+
+- Create a `PENDING` payment row first, then initiate STK Push
+- Store `CheckoutRequestID` immediately
+- Credit after a verified successful callback **or** a successful STK Query (`ResultCode = 0`)
+- Prefer the real M-Pesa receipt from the callback when present
+- Amount is always checked against the server-stored expected amount
+- Idempotent `processed` flag prevents double-crediting
+- Cancelled / failed / timeout / insufficient-funds codes mark the payment without crediting
+- `/payment/success?ref=...` polls status until `PAID`, `FAILED`, `CANCELLED`, or timeout
+
+Sandbox tip: use Safaricom’s published test MSISDN for STK simulator flows (commonly `254708374149`).
+
+## Images (Cloudinary)
+
+Event `poster` / `banner` and contestant `image` store a public URL string in PostgreSQL.
+
+Uploads go through `POST /api/upload` (approved organizers / admins only) and are stored in **Cloudinary**.
+
+Set these server-only env vars (never expose the API secret to the client):
+
+```text
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+CLOUDINARY_FOLDER=votia
+```
+
+On Vercel these are required. Locally, if they are omitted, uploads fall back to `public/uploads` (not durable across deploys).
+
+## Organizer approval (local test)
+
+Production always requires admin approval. To test locally:
+
+1. Register at `/register` (organizer starts `PENDING`)
+2. Log in as seeded admin `admin@votia.co.ke` / `Admin123!`
+3. Approve the organizer at `/admin`
+4. Use the organizer account — JWT refreshes approval from the DB (no special bypass)
 
 ## Routes
 
@@ -86,7 +158,8 @@ The `/payment/success` page only displays a success state after the backend has 
 
 ## Deployment
 
-- Set `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, and IntaSend keys.
-- Point `NEXT_PUBLIC_APP_URL` at the public HTTPS origin.
-- Configure the IntaSend webhook over HTTPS.
-- Run `npx prisma migrate deploy` (or `db push`) before `npm run build`.
+- Set `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, Daraja keys, and Cloudinary keys in Vercel
+- Point `NEXT_PUBLIC_APP_URL` at the public HTTPS origin (Vercel URL in production; `http://localhost:3000` locally)
+- Ensure Daraja can reach `https://your-domain/api/webhooks/daraja` (or set `DARAJA_CALLBACK_URL`)
+- Run `npx prisma migrate deploy` before or during deploy
+- Replace sandbox `DARAJA_SHORTCODE` / `DARAJA_PASSKEY` with Go-Live values when promoting to production
