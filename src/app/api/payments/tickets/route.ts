@@ -37,28 +37,60 @@ export async function POST(request: Request) {
   if (!isTicketingOpen(ticket.event)) {
     return NextResponse.json({ error: "Ticketing is closed for this event." }, { status: 400 });
   }
-  if (ticket.sold + parsed.data.quantity > ticket.quantity) {
-    return NextResponse.json({ error: "Not enough tickets remaining." }, { status: 400 });
-  }
 
   const amount = ticket.price * parsed.data.quantity;
-  const apiRef = `ticket_${randomUUID()}`;
+  if (!Number.isInteger(amount) || amount < 1) {
+    return NextResponse.json(
+      { error: "M-Pesa requires a ticket total of at least KES 1." },
+      { status: 400 },
+    );
+  }
 
-  const order = await prisma.ticketOrder.create({
-    data: {
-      eventId: ticket.eventId,
-      ticketId: ticket.id,
-      quantity: parsed.data.quantity,
-      amount,
-      currency: "KES",
-      apiRef,
-      status: "PENDING",
-      processed: false,
-      customerName: parsed.data.customerName,
-      customerPhone: phone,
-      customerEmail: parsed.data.customerEmail,
-    },
-  });
+  const apiRef = `ticket_${randomUUID()}`;
+  let orderId: string;
+
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR UPDATE`;
+      const locked = await tx.ticket.findUnique({ where: { id: ticket.id } });
+      if (!locked) {
+        throw new Error("Ticket not found.");
+      }
+
+      const pending = await tx.ticketOrder.aggregate({
+        where: { ticketId: ticket.id, status: "PENDING" },
+        _sum: { quantity: true },
+      });
+      const reserved = locked.sold + (pending._sum.quantity ?? 0);
+      if (reserved + parsed.data.quantity > locked.quantity) {
+        throw new Error("Not enough tickets remaining.");
+      }
+
+      return tx.ticketOrder.create({
+        data: {
+          eventId: ticket.eventId,
+          ticketId: ticket.id,
+          quantity: parsed.data.quantity,
+          amount,
+          currency: "KES",
+          apiRef,
+          status: "PENDING",
+          processed: false,
+          customerName: parsed.data.customerName,
+          customerPhone: phone,
+          customerEmail: parsed.data.customerEmail,
+        },
+      });
+    });
+    orderId = order.id;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to reserve tickets.";
+    const soldOut = message.includes("Not enough tickets");
+    return NextResponse.json(
+      { error: soldOut ? "Not enough tickets remaining." : "Unable to start ticket payment." },
+      { status: soldOut ? 400 : 500 },
+    );
+  }
 
   try {
     const stk = await initiateStkPush({
@@ -69,19 +101,17 @@ export async function POST(request: Request) {
     });
 
     await prisma.ticketOrder.update({
-      where: { id: order.id },
+      where: { id: orderId },
       data: { mpesaCheckoutRequestId: stk.checkoutRequestId },
     });
 
     return NextResponse.json({
       apiRef,
-      checkoutRequestId: stk.checkoutRequestId,
-      message:
-        "Check your phone for the M-Pesa prompt and enter your PIN.",
+      message: "Check your phone for the M-Pesa prompt and enter your PIN.",
     });
   } catch (error) {
     await prisma.ticketOrder.update({
-      where: { id: order.id },
+      where: { id: orderId },
       data: { status: "FAILED" },
     });
     console.error("Daraja ticket STK Push failed", {

@@ -1,5 +1,6 @@
 /**
- * Normalize Kenyan M-Pesa phone numbers to Daraja format: 2547XXXXXXXX
+ * Normalize Kenyan M-Pesa phone numbers to Daraja MSISDN format.
+ * Accepts Safaricom 07xx (2547) and Airtel 01xx (2541) mobiles.
  */
 export function normalizeMpesaPhone(input: string): string | null {
   const digits = input.replace(/\D/g, "");
@@ -7,10 +8,10 @@ export function normalizeMpesaPhone(input: string): string | null {
 
   let normalized = digits;
   if (normalized.startsWith("254") && normalized.length === 12) {
-    // already 2547XXXXXXXX
+    // already 2547XXXXXXXX or 2541XXXXXXXX
   } else if (normalized.startsWith("0") && normalized.length === 10) {
     normalized = `254${normalized.slice(1)}`;
-  } else if (normalized.length === 9 && normalized.startsWith("7")) {
+  } else if (normalized.length === 9 && (normalized.startsWith("7") || normalized.startsWith("1"))) {
     normalized = `254${normalized}`;
   } else if (normalized.startsWith("2540") && normalized.length === 13) {
     normalized = `254${normalized.slice(4)}`;
@@ -18,6 +19,6 @@ export function normalizeMpesaPhone(input: string): string | null {
     return null;
   }
 
-  if (!/^2547\d{8}$/.test(normalized)) return null;
+  if (!/^254[17]\d{8}$/.test(normalized)) return null;
   return normalized;
 }

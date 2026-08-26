@@ -1,7 +1,19 @@
+const FALLBACK_APP_URL = "http://localhost:3000";
+
 export function getAppUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000"
-  ).replace(/\/$/, "");
+  const raw = (process.env.NEXT_PUBLIC_APP_URL?.trim() || FALLBACK_APP_URL).replace(
+    /\/$/,
+    "",
+  );
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return FALLBACK_APP_URL;
+    }
+    return raw;
+  } catch {
+    return FALLBACK_APP_URL;
+  }
 }
 
 export const siteConfig = {

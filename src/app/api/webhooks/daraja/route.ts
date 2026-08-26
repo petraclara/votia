@@ -1,30 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  getDarajaCallbackUrl,
-  parseStkCallback,
-  type StkCallbackBody,
-} from "@/lib/payments/daraja";
+import { parseStkCallback, type StkCallbackBody } from "@/lib/payments/daraja";
 import { fulfillFromDarajaCallback } from "@/lib/payments/fulfill";
 
 /** Health check so we can verify the tunnel/webhook path is reachable. */
 export async function GET() {
-  try {
-    return NextResponse.json({
-      ok: true,
-      service: "daraja-webhook",
-      callbackUrl: getDarajaCallbackUrl(),
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        service: "daraja-webhook",
-        error: error instanceof Error ? error.message : "misconfigured",
-      },
-      { status: 503 },
-    );
-  }
+  return NextResponse.json({
+    ok: true,
+    service: "daraja-webhook",
+  });
 }
 
 export async function POST(request: Request) {
@@ -90,6 +74,7 @@ export async function POST(request: Request) {
       checkoutRequestId: parsed.checkoutRequestId,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" }, { status: 500 });
+    // Acknowledge so Safaricom does not retry while we inspect logs.
+    return NextResponse.json({ ResultCode: 0, ResultDesc: "Accepted" });
   }
 }

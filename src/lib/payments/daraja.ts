@@ -3,6 +3,10 @@ import { getAppUrl } from "@/lib/site";
 import { normalizeMpesaPhone } from "@/lib/payments/phone";
 import {
   accountReferenceFromApiRef,
+  buildStkPassword,
+  buildStkPushPayload,
+  darajaApiBaseUrl,
+  isPublicHttpsUrl,
   mapDarajaResultToState,
   parseStkCallback,
   type PaymentProviderState,
@@ -54,13 +58,23 @@ export type StkQueryResult = {
   raw: unknown;
 };
 
+const DARAJA_TIMEOUT_MS = 20_000;
+
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-function darajaBaseUrl() {
-  const env = (process.env.DARAJA_ENV ?? "sandbox").toLowerCase();
-  return env === "production"
-    ? "https://api.safaricom.co.ke"
-    : "https://sandbox.safaricom.co.ke";
+async function darajaFetch(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DARAJA_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal, cache: "no-store" });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Daraja request timed out.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function isDarajaConfigured() {
@@ -96,36 +110,12 @@ function timestampNow() {
   return `${yyyy}${mm}${dd}${hh}${mi}${ss}`;
 }
 
-function buildPassword(shortcode: string, passkey: string, timestamp: string) {
-  return Buffer.from(`${shortcode}${passkey}${timestamp}`).toString("base64");
-}
-
 function transactionType() {
   return process.env.DARAJA_TRANSACTION_TYPE?.trim() || "CustomerPayBillOnline";
 }
 
 function partyB(shortcode: string) {
   return process.env.DARAJA_PARTY_B?.trim() || shortcode;
-}
-
-function isPublicHttpsUrl(value: string) {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:") return false;
-    const host = url.hostname.toLowerCase();
-    if (
-      host === "localhost" ||
-      host === "127.0.0.1" ||
-      host === "::1" ||
-      host.endsWith(".local") ||
-      host.endsWith(".internal")
-    ) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function callbackUrl() {
@@ -195,11 +185,10 @@ export async function getDarajaAccessToken() {
   }
 
   const credentials = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
-  const url = `${darajaBaseUrl()}/oauth/v1/generate?grant_type=client_credentials`;
-  const response = await fetch(url, {
+  const url = `${darajaApiBaseUrl()}/oauth/v1/generate?grant_type=client_credentials`;
+  const response = await darajaFetch(url, {
     method: "GET",
     headers: { Authorization: `Basic ${credentials}` },
-    cache: "no-store",
   });
   const body = await readResponseBody(response);
   const data = (body.json ?? {}) as DarajaTokenResponse;
@@ -240,25 +229,20 @@ export async function initiateStkPush(input: {
   const { passkey, shortcode } = requireDarajaConfig();
   const token = await getDarajaAccessToken();
   const timestamp = timestampNow();
-  const password = buildPassword(shortcode, passkey, timestamp);
   const accountReference = accountReferenceFromApiRef(input.apiRef);
-  const transactionDesc =
-    input.description.replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 13) || "Votia pay";
   const callBackURL = callbackUrl();
-
-  const payload = {
-    BusinessShortCode: shortcode,
-    Password: password,
-    Timestamp: timestamp,
-    TransactionType: transactionType(),
-    Amount: input.amount,
-    PartyA: phone,
-    PartyB: partyB(shortcode),
-    PhoneNumber: phone,
-    CallBackURL: callBackURL,
-    AccountReference: accountReference,
-    TransactionDesc: transactionDesc,
-  };
+  const payload = buildStkPushPayload({
+    shortcode,
+    passkey,
+    timestamp,
+    transactionType: transactionType(),
+    amount: input.amount,
+    phone,
+    partyB: partyB(shortcode),
+    callBackURL,
+    accountReference,
+    transactionDesc: input.description,
+  });
 
   console.info("Daraja STK Push initiating", {
     apiRef: input.apiRef,
@@ -270,14 +254,13 @@ export async function initiateStkPush(input: {
     env: process.env.DARAJA_ENV ?? "sandbox",
   });
 
-  const response = await fetch(`${darajaBaseUrl()}/mpesa/stkpush/v1/processrequest`, {
+  const response = await darajaFetch(`${darajaApiBaseUrl()}/mpesa/stkpush/v1/processrequest`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
-    cache: "no-store",
   });
   const body = await readResponseBody(response);
   const data = (body.json ?? {}) as StkPushResponse;
@@ -314,9 +297,9 @@ export async function queryStkStatus(checkoutRequestId: string): Promise<StkQuer
   const { passkey, shortcode } = requireDarajaConfig();
   const token = await getDarajaAccessToken();
   const timestamp = timestampNow();
-  const password = buildPassword(shortcode, passkey, timestamp);
+  const password = buildStkPassword(shortcode, passkey, timestamp);
 
-  const response = await fetch(`${darajaBaseUrl()}/mpesa/stkpushquery/v1/query`, {
+  const response = await darajaFetch(`${darajaApiBaseUrl()}/mpesa/stkpushquery/v1/query`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -328,7 +311,6 @@ export async function queryStkStatus(checkoutRequestId: string): Promise<StkQuer
       Timestamp: timestamp,
       CheckoutRequestID: checkoutRequestId,
     }),
-    cache: "no-store",
   });
 
   const body = await readResponseBody(response);

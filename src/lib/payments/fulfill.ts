@@ -30,7 +30,6 @@ export type PaymentStatusPayload = {
   amount: number;
   currency: string;
   mpesaReceiptNumber: string | null;
-  mpesaCheckoutRequestId: string | null;
   nextPollMs: number;
   retryAfterMs: number | null;
 };
@@ -249,6 +248,7 @@ export async function fulfillFromDarajaCallback(parsed: ParsedStkCallback) {
       expected: record.amount,
       paid: parsed.amount,
     });
+    await markTerminalStatus(kind, record.id, "FAILED", parsed.checkoutRequestId);
     return { ok: false as const, reason: "amount_mismatch", apiRef: record.apiRef };
   }
 
@@ -447,7 +447,6 @@ export async function getPaymentStatusByApiRef(
     amount: record.amount,
     currency: record.currency,
     mpesaReceiptNumber: record.mpesaReceiptNumber,
-    mpesaCheckoutRequestId: record.mpesaCheckoutRequestId,
     nextPollMs: terminal ? 0 : MIN_STK_QUERY_INTERVAL_MS,
     retryAfterMs: null,
   };

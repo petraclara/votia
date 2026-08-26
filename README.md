@@ -58,7 +58,7 @@ Payments are initiated only on the server. Votes and tickets are **not** credite
 
 1. Create a sandbox app in the [Safaricom Daraja portal](https://developer.safaricom.co.ke/) and enable **Lipa Na M-Pesa Online**.
 2. Copy your **Consumer Key** and **Consumer Secret** into `.env` / `.env.local` (never commit them).
-3. The portal often shows Passkey / Short Code as **N/A** in sandbox. Use Safaricom’s public Lipa Na M-Pesa Online sandbox test values in env (see `.env.example`):
+3. The portal often shows Passkey / Short Code as **N/A** in sandbox. Use Safaricom’s public Lipa Na M-Pesa Online sandbox test values locally (these are published test values, not your production secrets):
 
 ```text
 DARAJA_CONSUMER_KEY=your_key
@@ -156,10 +156,30 @@ Production always requires admin approval. To test locally:
 - `/dashboard` organizer tools
 - `/admin` platform admin (approve organizers, disable events, revenue)
 
-## Deployment
+## Deployment (Vercel)
 
-- Set `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, Daraja keys, and Cloudinary keys in Vercel
-- Point `NEXT_PUBLIC_APP_URL` at the public HTTPS origin (Vercel URL in production; `http://localhost:3000` locally)
-- Ensure Daraja can reach `https://your-domain/api/webhooks/daraja` (or set `DARAJA_CALLBACK_URL`)
+Set these on Production, Preview, and Development. Do not leave `DATABASE_URL` or `NEXTAUTH_SECRET` empty.
+
+Required:
+
+```text
+DATABASE_URL=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=https://YOUR_DOMAIN
+NEXT_PUBLIC_APP_URL=https://YOUR_DOMAIN
+DARAJA_CONSUMER_KEY=
+DARAJA_CONSUMER_SECRET=
+DARAJA_PASSKEY=
+DARAJA_SHORTCODE=
+DARAJA_ENV=sandbox
+DARAJA_CALLBACK_URL=https://YOUR_DOMAIN/api/webhooks/daraja
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+```
+
+Keep `DARAJA_ENV=sandbox` until live Safaricom credentials are provided. Then set `DARAJA_ENV=production` and replace shortcode/passkey with Go-Live values.
+
 - Run `npx prisma migrate deploy` before or during deploy
-- Replace sandbox `DARAJA_SHORTCODE` / `DARAJA_PASSKEY` with Go-Live values when promoting to production
+- `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` must be the public HTTPS origin (not localhost) in Vercel
+- Localhost: keep both on `http://localhost:3000` and use STK Query polling; set `DARAJA_CALLBACK_URL` only if you have a public HTTPS tunnel

@@ -53,12 +53,28 @@ test("failed and incomplete payments do not credit votes", () => {
     paidCurrency: "KES",
   };
   assert.equal(decideVoteFulfillment({ ...base, state: "FAILED" }), "failed");
+  assert.equal(decideVoteFulfillment({ ...base, state: "CANCELLED" }), "cancelled");
   assert.equal(decideVoteFulfillment({ ...base, state: "PROCESSING" }), "not_complete");
   assert.equal(
     decideVoteFulfillment({ ...base, paidAmount: 50, state: "COMPLETE" }),
     "amount_mismatch",
   );
   assert.equal(decideVoteFulfillment({ ...base, state: "COMPLETE" }), "credit");
+});
+
+test("already processed payments stay idempotent even if callback is replayed", () => {
+  assert.equal(
+    decideVoteFulfillment({
+      processed: true,
+      status: "PAID",
+      expectedAmount: 200,
+      expectedCurrency: "KES",
+      paidAmount: 200,
+      paidCurrency: "KES",
+      state: "COMPLETE",
+    }),
+    "already_processed",
+  );
 });
 
 test("platform fee is not treated as 100% of collections", () => {

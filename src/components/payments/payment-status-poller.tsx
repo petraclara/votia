@@ -20,6 +20,7 @@ export function PaymentStatusPoller({
     "Check your phone for the M-Pesa prompt and enter your PIN.",
   );
   const [timedOut, setTimedOut] = useState(false);
+  const [round, setRound] = useState(0);
   const startedAt = useRef(Date.now());
   const inFlight = useRef(false);
   const stopped = useRef(false);
@@ -32,6 +33,8 @@ export function PaymentStatusPoller({
     }
 
     stopped.current = false;
+    startedAt.current = Date.now();
+    delayMs.current = INITIAL_POLL_MS;
 
     const clearTimer = () => {
       if (timer.current) {
@@ -127,7 +130,7 @@ export function PaymentStatusPoller({
     return () => {
       stop();
     };
-  }, [apiRef, initialStatus, router]);
+  }, [apiRef, initialStatus, router, round]);
 
   return (
     <div className="mt-4 space-y-2 text-sm text-muted">
@@ -145,6 +148,7 @@ export function PaymentStatusPoller({
             startedAt.current = Date.now();
             delayMs.current = INITIAL_POLL_MS;
             stopped.current = false;
+            setRound((n) => n + 1);
             router.refresh();
           }}
         >

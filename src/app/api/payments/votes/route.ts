@@ -81,9 +81,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       apiRef,
-      checkoutRequestId: stk.checkoutRequestId,
-      message:
-        "Check your phone for the M-Pesa prompt and enter your PIN.",
+      message: "Check your phone for the M-Pesa prompt and enter your PIN.",
     });
   } catch (error) {
     await prisma.voteTransaction.update({
